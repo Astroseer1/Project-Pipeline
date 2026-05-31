@@ -1,0 +1,1679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Hue Sensei / 辨色达人</title>
+<style>
+  *, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --card: #ffffff;
+    --card-hover: #f0f0f0;
+    --accent: #e94560;
+    --text: #ffffff;
+    --text-dim: #a0a0b8;
+    --correct: #27ae60;
+    --wrong: #e74c3c;
+    --timer-green: #27ae60;
+    --timer-yellow: #f1c40f;
+    --timer-red: #e74c3c;
+    --shadow: rgba(0,0,0,0.3);
+    --radius: 16px;
+    --button-radius: 12px;
+    --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .game-container {
+    width: 100%;
+    max-width: 520px;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* ===== Timer Bar ===== */
+  .timer-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 6px;
+    background: rgba(255,255,255,0.08);
+    z-index: 100;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+  }
+  .timer-bar.visible {
+    opacity: 1;
+  }
+  .timer-bar-fill {
+    height: 100%;
+    width: 100%;
+    border-radius: 0 3px 3px 0;
+    transition: background-color 0.3s ease;
+    will-change: width;
+  }
+
+  /* ===== Screen Shared ===== */
+  .screen {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .screen.active {
+    display: flex;
+  }
+
+  /* ===== Start Screen ===== */
+  #startScreen {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  }
+
+  .game-logo {
+    font-size: clamp(40px, 8vw, 64px);
+    font-weight: 800;
+    letter-spacing: -1px;
+    background: linear-gradient(135deg, #e94560, #ff6b6b);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+
+  .game-subtitle {
+    font-size: clamp(14px, 2.5vw, 18px);
+    color: var(--text-dim);
+    text-align: center;
+    margin-bottom: 48px;
+    line-height: 1.5;
+  }
+
+  .btn-primary {
+    padding: 16px 56px;
+    font-size: clamp(18px, 3vw, 22px);
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(135deg, #e94560, #c0392b);
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: transform var(--transition), box-shadow var(--transition);
+    box-shadow: 0 8px 24px rgba(233, 69, 96, 0.35);
+    min-width: 200px;
+    letter-spacing: 0.5px;
+  }
+  .btn-primary:hover, .btn-primary:active {
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 12px 32px rgba(233, 69, 96, 0.5);
+  }
+  .btn-primary:active {
+    transform: translateY(0) scale(0.98);
+  }
+
+  /* ===== Tutorial Screen ===== */
+  #tutorialScreen {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    gap: 8px;
+  }
+  .tutorial-title {
+    font-size: clamp(28px, 5vw, 38px);
+    font-weight: 800;
+    margin-bottom: 12px;
+    text-align: center;
+    background: linear-gradient(135deg, #e94560, #ff6b6b);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .tutorial-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 36px;
+    width: 100%;
+    max-width: 400px;
+  }
+  .tutorial-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    font-size: clamp(15px, 2.5vw, 18px);
+    line-height: 1.5;
+    padding: 16px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.08);
+    text-align: left;
+  }
+  .tutorial-step-icon {
+    font-size: clamp(28px, 4vw, 36px);
+    flex-shrink: 0;
+    line-height: 1;
+  }
+  .tutorial-step-text {
+    flex: 1;
+  }
+
+  /* ===== Game Screen ===== */
+  #gameScreen {
+    background: var(--bg);
+    padding: 16px 20px 20px;
+  }
+
+  .game-hud {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 4px;
+    margin-top: 10px;
+    margin-bottom: 8px;
+    min-height: 32px;
+  }
+  .hud-score, .hud-combo {
+    font-size: clamp(15px, 2.5vw, 18px);
+    font-weight: 600;
+  }
+  .hud-score { color: var(--text); }
+  .hud-combo { color: var(--accent); }
+  .hud-combo .combo-num {
+    display: inline-block;
+    transition: transform 0.2s ease;
+  }
+  .hud-combo .combo-num.pop {
+    animation: popNum 0.3s ease;
+  }
+  @keyframes popNum {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.4); }
+    100% { transform: scale(1); }
+  }
+
+  .color-block-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    padding: 4px 0;
+  }
+
+  .canvas-wrapper {
+    width: 100%;
+    max-width: 380px;
+    aspect-ratio: 4 / 3;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .canvas-wrapper canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border-radius: var(--radius);
+  }
+
+  .hex-label {
+    font-size: clamp(16px, 3vw, 22px);
+    font-weight: 700;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    margin-top: 10px;
+    font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+    transition: opacity 0.2s ease;
+  }
+
+  /* ===== Option Buttons Grid ===== */
+  .options-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 12px;
+    width: 100%;
+  }
+
+  .btn-option {
+    padding: 16px 8px;
+    font-size: clamp(15px, 2.5vw, 18px);
+    font-weight: 600;
+    color: #222;
+    background: var(--card);
+    border: 2px solid rgba(0,0,0,0.06);
+    border-radius: var(--button-radius);
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.25s ease, border-color 0.25s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    min-height: 54px;
+    word-break: break-word;
+    text-align: center;
+    -webkit-tap-highlight-color: transparent;
+    line-height: 1.3;
+  }
+  .btn-option:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    background: var(--card-hover);
+    border-color: rgba(233, 69, 96, 0.3);
+  }
+  .btn-option:active {
+    transform: translateY(0) scale(0.98);
+  }
+  .btn-option.correct {
+    background: var(--correct) !important;
+    color: #fff !important;
+    border-color: var(--correct) !important;
+    transform: scale(1.05);
+  }
+  .btn-option.wrong {
+    background: var(--wrong) !important;
+    color: #fff !important;
+    border-color: var(--wrong) !important;
+    animation: shake 0.4s ease;
+  }
+  .btn-option:disabled {
+    cursor: default;
+    opacity: 0.7;
+  }
+  .btn-option:disabled:hover {
+    transform: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    15% { transform: translateX(-8px) rotate(-2deg); }
+    30% { transform: translateX(8px) rotate(2deg); }
+    45% { transform: translateX(-6px) rotate(-1deg); }
+    60% { transform: translateX(6px) rotate(1deg); }
+    75% { transform: translateX(-3px); }
+    90% { transform: translateX(3px); }
+  }
+
+  /* ===== Color Block Feedback ===== */
+  .canvas-wrapper.correct-flash canvas {
+    animation: correctPulse 0.4s ease;
+  }
+  .canvas-wrapper.wrong-flash canvas {
+    animation: wrongFlash 0.5s ease;
+  }
+
+  @keyframes correctPulse {
+    0% { filter: brightness(1); }
+    30% { filter: brightness(1.3) saturate(1.3); }
+    60% { filter: brightness(0.9) saturate(1.1); }
+    100% { filter: brightness(1); }
+  }
+  @keyframes wrongFlash {
+    0% { filter: brightness(1) hue-rotate(0deg); }
+    20% { filter: brightness(1.5) hue-rotate(180deg); }
+    40% { filter: brightness(0.7) hue-rotate(360deg); }
+    60% { filter: brightness(1.2) hue-rotate(180deg); }
+    100% { filter: brightness(1) hue-rotate(0deg); }
+  }
+
+  /* ===== Game Over Screen ===== */
+  #gameOverScreen {
+    background: rgba(10, 10, 20, 0.88);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 50;
+    overflow-y: auto;
+    justify-content: flex-start;
+    padding-top: 48px;
+    padding-bottom: 32px;
+  }
+
+  .gameover-title {
+    font-size: clamp(42px, 10vw, 68px);
+    font-weight: 800;
+    color: var(--accent);
+    margin-bottom: 12px;
+    text-align: center;
+  }
+
+  /* ===== Nickname Section ===== */
+  .nickname-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    width: 100%;
+    max-width: 320px;
+  }
+  .nickname-section.hidden {
+    display: none;
+  }
+  .nickname-input {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 16px;
+    border-radius: 12px;
+    border: 2px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.06);
+    color: var(--text);
+    text-align: center;
+    outline: none;
+    transition: border-color 0.3s ease, background 0.3s ease;
+  }
+  .nickname-input:focus {
+    border-color: var(--accent);
+    background: rgba(255,255,255,0.1);
+  }
+  .nickname-input::placeholder {
+    color: var(--text-dim);
+    opacity: 0.7;
+  }
+  .btn-nickname-submit {
+    padding: 10px 36px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(135deg, #e94560, #c0392b);
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: transform var(--transition), box-shadow var(--transition);
+    box-shadow: 0 4px 16px rgba(233, 69, 96, 0.3);
+    letter-spacing: 0.5px;
+  }
+  .btn-nickname-submit:hover, .btn-nickname-submit:active {
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 8px 24px rgba(233, 69, 96, 0.4);
+  }
+
+  /* ===== Score Section (Game Over) ===== */
+  .gameover-results {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+  .gameover-results.visible {
+    display: flex;
+  }
+
+  .gameover-score-label {
+    font-size: clamp(16px, 3vw, 20px);
+    color: var(--text-dim);
+    margin-top: 8px;
+  }
+  .gameover-score {
+    font-size: clamp(56px, 12vw, 80px);
+    font-weight: 800;
+    color: var(--text);
+    line-height: 1;
+    margin: 8px 0;
+  }
+  .gameover-best {
+    font-size: clamp(16px, 2.5vw, 20px);
+    color: var(--text-dim);
+    margin-bottom: 20px;
+  }
+  .gameover-best span {
+    color: #f1c40f;
+    font-weight: 700;
+  }
+
+  /* ===== Leaderboard ===== */
+  .leaderboard-section {
+    width: 100%;
+    max-width: 400px;
+    margin-bottom: 16px;
+  }
+  .leaderboard-title {
+    font-size: clamp(18px, 3vw, 22px);
+    font-weight: 700;
+    color: #f1c40f;
+    margin-bottom: 10px;
+    text-align: center;
+  }
+  .leaderboard-list {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: clamp(13px, 2vw, 15px);
+  }
+  .leaderboard-list th,
+  .leaderboard-list td {
+    padding: 6px 8px;
+    text-align: center;
+  }
+  .leaderboard-list th {
+    color: var(--text-dim);
+    font-weight: 600;
+    font-size: 0.85em;
+    border-bottom: 1px solid rgba(255,255,255,0.12);
+  }
+  .leaderboard-list td {
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    padding-top: 7px;
+    padding-bottom: 7px;
+  }
+  .leaderboard-list tr:nth-child(even) td {
+    background: rgba(255,255,255,0.02);
+  }
+  .leaderboard-list tr.rank-1 td:first-child {
+    color: #ffd700;
+    font-weight: 700;
+  }
+  .leaderboard-list tr.rank-2 td:first-child {
+    color: #c0c0c0;
+    font-weight: 700;
+  }
+  .leaderboard-list tr.rank-3 td:first-child {
+    color: #cd7f32;
+    font-weight: 700;
+  }
+  .leaderboard-empty {
+    text-align: center;
+    color: var(--text-dim);
+    padding: 20px 16px;
+    font-size: 14px;
+  }
+  .leaderboard-empty-icon {
+    font-size: 28px;
+    margin-bottom: 8px;
+  }
+
+  .btn-play-again {
+    padding: 16px 48px;
+    font-size: clamp(17px, 3vw, 20px);
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(135deg, #e94560, #c0392b);
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: transform var(--transition), box-shadow var(--transition);
+    box-shadow: 0 8px 24px rgba(233, 69, 96, 0.35);
+    min-width: 200px;
+    letter-spacing: 0.5px;
+  }
+  .btn-play-again:hover, .btn-play-again:active {
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 12px 32px rgba(233, 69, 96, 0.5);
+  }
+  .btn-play-again:active {
+    transform: translateY(0) scale(0.98);
+  }
+
+  .btn-share {
+    padding: 12px 36px;
+    font-size: clamp(14px, 2.5vw, 16px);
+    font-weight: 600;
+    color: #fff;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 50px;
+    cursor: pointer;
+    transition: transform var(--transition), background var(--transition);
+    margin-bottom: 16px;
+    letter-spacing: 0.5px;
+  }
+  .btn-share:hover, .btn-share:active {
+    transform: translateY(-2px) scale(1.03);
+    background: rgba(255,255,255,0.18);
+  }
+
+  .toast {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.9);
+    background: rgba(0,0,0,0.85);
+    color: #fff;
+    padding: 14px 28px;
+    border-radius: 14px;
+    font-size: clamp(15px, 2.5vw, 18px);
+    font-weight: 600;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    z-index: 300;
+  }
+  .toast.visible {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 400px) {
+    .game-container { padding: 0; }
+    #gameScreen { padding: 12px 14px 16px; }
+    .options-grid { gap: 8px; }
+    .btn-option { padding: 10px 4px; min-height: 44px; font-size: 13px; }
+    .canvas-wrapper { max-width: 320px; }
+    #gameOverScreen { padding-top: 32px; padding-bottom: 24px; }
+  }
+
+  @media (min-width: 768px) {
+    .game-container {
+      height: min(100vh, 800px);
+      margin: auto;
+      border-radius: 24px;
+      box-shadow: 0 0 60px rgba(0,0,0,0.5);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    #gameScreen { padding: 20px 28px 24px; }
+  }
+
+  @media (min-width: 1200px) {
+    .game-container { max-width: 560px; }
+  }
+
+  /* ===== Color Showcase (Start Screen) ===== */
+  .color-showcase {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 36px;
+    justify-content: center;
+  }
+  .showcase-block {
+    width: clamp(36px, 8vw, 52px);
+    height: clamp(36px, 8vw, 52px);
+    border-radius: 12px;
+    animation: showcasePulse 3s ease-in-out infinite;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  }
+  .showcase-block:nth-child(1) { animation-delay: 0s; }
+  .showcase-block:nth-child(2) { animation-delay: 0.3s; }
+  .showcase-block:nth-child(3) { animation-delay: 0.6s; }
+  .showcase-block:nth-child(4) { animation-delay: 0.9s; }
+  .showcase-block:nth-child(5) { animation-delay: 1.2s; }
+  .showcase-block:nth-child(6) { animation-delay: 1.5s; }
+
+  @keyframes showcasePulse {
+    0%, 100% { transform: translateY(0) scale(1); opacity: 0.8; }
+    15% { transform: translateY(-8px) scale(1.08); opacity: 1; }
+    30% { transform: translateY(0) scale(1); opacity: 0.8; }
+  }
+
+  /* ===== Color-Blind Mode Toggle ===== */
+  .cb-toggle-wrap {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 16px;
+  }
+  .btn-cb-toggle {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: var(--text-dim);
+    padding: 7px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all var(--transition);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    letter-spacing: 0.3px;
+    line-height: 1.4;
+  }
+  .btn-cb-toggle:hover {
+    background: rgba(255,255,255,0.12);
+    color: var(--text);
+  }
+  .btn-cb-toggle.active {
+    background: rgba(233, 69, 96, 0.2);
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  .footer-credit {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    color: rgba(255,255,255,0.2);
+    letter-spacing: 1px;
+    white-space: nowrap;
+  }
+
+  @media (orientation: landscape) and (max-height: 500px) {
+    #gameScreen {
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 8px 16px;
+    }
+    .game-hud {
+      width: 100%;
+      margin-top: 2px;
+      margin-bottom: 2px;
+      min-height: 24px;
+    }
+    .color-block-area {
+      flex: 0 0 45%;
+      max-height: 75vh;
+      padding: 0;
+    }
+    .canvas-wrapper {
+      max-width: 100%;
+      aspect-ratio: 3/2;
+    }
+    .hex-label { font-size: 12px; margin-top: 4px; }
+    .options-grid {
+      flex: 0 0 50%;
+      margin-top: 0;
+      gap: 6px;
+    }
+    .btn-option {
+      padding: 8px 4px;
+      min-height: 32px;
+      font-size: 12px;
+      line-height: 1.2;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="game-container" id="gameContainer">
+
+  <!-- Timer Bar -->
+  <div class="timer-bar" id="timerBar">
+    <div class="timer-bar-fill" id="timerFill"></div>
+  </div>
+
+  <!-- ===== START SCREEN ===== -->
+  <div class="screen active" id="startScreen">
+    <div class="game-logo">Hue Sensei<br>辨色达人</div>
+    <div class="game-subtitle">Learn colors in two languages<br>边玩边学中英文颜色</div>
+    <div class="color-showcase" id="colorShowcase">
+      <div class="showcase-block" style="background:#FF0000;"></div>
+      <div class="showcase-block" style="background:#FFA500;"></div>
+      <div class="showcase-block" style="background:#FFD700;"></div>
+      <div class="showcase-block" style="background:#008000;"></div>
+      <div class="showcase-block" style="background:#0000FF;"></div>
+      <div class="showcase-block" style="background:#800080;"></div>
+    </div>
+    <div class="cb-toggle-wrap">
+      <button class="btn-cb-toggle" id="btnCbToggle">👁️ Color Blind Mode / 色盲模式</button>
+    </div>
+    <button class="btn-primary" id="btnPlay">PLAY / 开始</button>
+    <div class="footer-credit">Made with Luna</div>
+  </div>
+
+  <!-- ===== TUTORIAL SCREEN ===== -->
+  <div class="screen" id="tutorialScreen">
+    <div class="tutorial-title">How to Play / 玩法说明</div>
+    <div class="tutorial-steps">
+      <div class="tutorial-step">
+        <div class="tutorial-step-icon">🎨</div>
+        <div class="tutorial-step-text">A color block appears<br>屏幕显示一个色块</div>
+      </div>
+      <div class="tutorial-step">
+        <div class="tutorial-step-icon">👆</div>
+        <div class="tutorial-step-text">Pick the correct name from 4 options<br>从4个选项中选出正确的颜色名</div>
+      </div>
+      <div class="tutorial-step">
+        <div class="tutorial-step-icon">⏱️</div>
+        <div class="tutorial-step-text">Answer faster as you go!<br>连续答对会越来越快！</div>
+      </div>
+    </div>
+    <button class="btn-primary" id="btnGotIt">GOT IT / 知道了</button>
+  </div>
+
+  <!-- ===== GAME SCREEN ===== -->
+  <div class="screen" id="gameScreen">
+    <div class="game-hud">
+      <div class="hud-score"><span id="scoreLabel">Score / 得分</span>: <span id="scoreDisplay">0</span></div>
+      <div class="hud-combo"><span id="comboLabel">Combo / 连击</span>: <span class="combo-num" id="comboDisplay">0</span></div>
+    </div>
+
+    <div class="color-block-area">
+      <div class="canvas-wrapper" id="canvasWrapper">
+        <canvas id="colorCanvas"></canvas>
+      </div>
+      <div class="hex-label" id="hexLabel">#000000</div>
+    </div>
+
+    <div class="options-grid" id="optionsGrid">
+      <button class="btn-option" data-index="0"></button>
+      <button class="btn-option" data-index="1"></button>
+      <button class="btn-option" data-index="2"></button>
+      <button class="btn-option" data-index="3"></button>
+    </div>
+  </div>
+
+  <!-- ===== GAME OVER SCREEN ===== -->
+  <div class="screen" id="gameOverScreen">
+    <div class="gameover-title">Game Over / 游戏结束</div>
+
+    <!-- Nickname Input (Phase 1) -->
+    <div class="nickname-section" id="nicknameSection">
+      <input class="nickname-input" id="nicknameInput" type="text" placeholder="Your name / 你的名字" maxlength="20" autocomplete="off">
+      <button class="btn-nickname-submit" id="btnSubmitNickname">Continue / 继续</button>
+    </div>
+
+    <!-- Results (Phase 2) -->
+    <div class="gameover-results" id="gameoverResults">
+      <div class="gameover-score-label">Score / 得分</div>
+      <div class="gameover-score" id="finalScore">0</div>
+      <div class="gameover-best"><span>Best / 最高分</span>: <span id="bestScore">0</span></div>
+
+      <button class="btn-share" id="btnShare">📤 Share Score / 分享成绩</button>
+
+      <div class="leaderboard-section">
+        <div class="leaderboard-title" id="leaderboardTitle">🏆 Leaderboard / 排行榜</div>
+        <div id="leaderboardContent">
+          <div class="leaderboard-empty" id="leaderboardEmpty">
+            <div class="leaderboard-empty-icon">🏆</div>
+            No scores yet / 暂无记录
+          </div>
+          <table class="leaderboard-list" id="leaderboardTable" style="display:none">
+            <thead>
+              <tr><th>#</th><th>Name / 名字</th><th>Score / 得分</th><th>Date / 日期</th></tr>
+            </thead>
+            <tbody id="leaderboardBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <button class="btn-play-again" id="btnPlayAgain">Play Again / 再来一次</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Copied! / 已复制！</div>
+
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ============================================================
+  // COLOR DATA - 52 entries with bilingual names (unchanged)
+  // ============================================================
+  const COLORS = [
+    // Reds
+    { hex: "#FF0000", name: "Red", name_zh: "红色", distractors: ["Crimson", "Scarlet", "Rose"], distractors_zh: ["深红", "猩红", "玫瑰红"] },
+    { hex: "#8B0000", name: "Dark Red", name_zh: "深红色", distractors: ["Maroon", "Burgundy", "Mahogany"], distractors_zh: ["栗色", "勃艮第红", "红木色"] },
+    { hex: "#DC143C", name: "Crimson", name_zh: "绯红色", distractors: ["Ruby", "Cherry", "Carmine"], distractors_zh: ["宝石红", "樱桃红", "胭脂红"] },
+    { hex: "#FF4500", name: "Orange Red", name_zh: "橙红色", distractors: ["Tomato", "Tangerine", "Coral"], distractors_zh: ["番茄红", "橘红", "珊瑚红"] },
+    { hex: "#CD5C5C", name: "Indian Red", name_zh: "印度红", distractors: ["Salmon", "Brick", "Rust"], distractors_zh: ["鲑鱼红", "砖红", "铁锈红"] },
+    // Oranges
+    { hex: "#FFA500", name: "Orange", name_zh: "橙色", distractors: ["Tangerine", "Apricot", "Amber"], distractors_zh: ["蜜橘色", "杏色", "琥珀色"] },
+    { hex: "#FF8C00", name: "Dark Orange", name_zh: "深橙色", distractors: ["Pumpkin", "Carrot", "Gold"], distractors_zh: ["南瓜色", "胡萝卜色", "金色"] },
+    { hex: "#FF7F50", name: "Coral", name_zh: "珊瑚色", distractors: ["Peach", "Salmon", "Melon"], distractors_zh: ["蜜桃色", "鲑鱼色", "甜瓜色"] },
+    { hex: "#FF6347", name: "Tomato", name_zh: "番茄色", distractors: ["Chili", "Paprika", "Salsa"], distractors_zh: ["辣椒红", "辣椒粉", "萨尔萨红"] },
+    // Yellows
+    { hex: "#FFD700", name: "Gold", name_zh: "金色", distractors: ["Amber", "Honey", "Brass"], distractors_zh: ["琥珀", "蜂蜜色", "黄铜色"] },
+    { hex: "#FFFF00", name: "Yellow", name_zh: "黄色", distractors: ["Lemon", "Canary", "Sunshine"], distractors_zh: ["柠檬黄", "金丝雀黄", "阳光黄"] },
+    { hex: "#F0E68C", name: "Khaki", name_zh: "卡其色", distractors: ["Sand", "Tan", "Beige"], distractors_zh: ["沙色", "棕褐色", "米色"] },
+    { hex: "#FFFACD", name: "Lemon Chiffon", name_zh: "柠檬绸色", distractors: ["Cream", "Vanilla", "Butter"], distractors_zh: ["奶油色", "香草色", "黄油色"] },
+    // Greens
+    { hex: "#008000", name: "Green", name_zh: "绿色", distractors: ["Forest", "Emerald", "Moss"], distractors_zh: ["森林绿", "翡翠绿", "苔藓绿"] },
+    { hex: "#00FF00", name: "Lime", name_zh: "青柠色", distractors: ["Neon", "Spring", "Chartreuse"], distractors_zh: ["霓虹绿", "春绿", "查特酒绿"] },
+    { hex: "#006400", name: "Dark Green", name_zh: "深绿色", distractors: ["Pine", "Hunter", "Evergreen"], distractors_zh: ["松树绿", "猎人绿", "常青绿"] },
+    { hex: "#2E8B57", name: "Sea Green", name_zh: "海绿色", distractors: ["Ocean", "Jade", "Mint"], distractors_zh: ["海洋绿", "翡翠色", "薄荷绿"] },
+    { hex: "#3CB371", name: "Medium Sea Green", name_zh: "中海绿", distractors: ["Sage", "Herb", "Leaf"], distractors_zh: ["鼠尾草绿", "香草绿", "树叶绿"] },
+    { hex: "#00FA9A", name: "Medium Spring Green", name_zh: "中春绿", distractors: ["Mint", "Spearmint", "Verdant"], distractors_zh: ["薄荷色", "留兰香绿", "翠绿色"] },
+    { hex: "#7CFC00", name: "Lawn Green", name_zh: "草坪绿", distractors: ["Grass", "Meadow", "Field"], distractors_zh: ["青草色", "草地绿", "田野绿"] },
+    // Blues
+    { hex: "#0000FF", name: "Blue", name_zh: "蓝色", distractors: ["Navy", "Ocean", "Sky"], distractors_zh: ["海军蓝", "海洋蓝", "天蓝"] },
+    { hex: "#000080", name: "Navy", name_zh: "海军蓝", distractors: ["Midnight", "Ink", "Denim"], distractors_zh: ["午夜蓝", "墨蓝色", "牛仔蓝"] },
+    { hex: "#1E90FF", name: "Dodger Blue", name_zh: "道奇蓝", distractors: ["Azure", "Electric", "Royal"], distractors_zh: ["天青蓝", "电光蓝", "皇家蓝"] },
+    { hex: "#00BFFF", name: "Deep Sky Blue", name_zh: "深天蓝", distractors: ["Horizon", "Atmosphere", "Celestial"], distractors_zh: ["地平线蓝", "大气蓝", "苍穹蓝"] },
+    { hex: "#00CED1", name: "Dark Turquoise", name_zh: "深绿松色", distractors: ["Teal", "Lagoon", "Tropical"], distractors_zh: ["蓝绿色", "泻湖蓝", "热带蓝"] },
+    { hex: "#4169E1", name: "Royal Blue", name_zh: "宝蓝色", distractors: ["Majestic", "Imperial", "Regal"], distractors_zh: ["威严蓝", "帝国蓝", "帝王蓝"] },
+    { hex: "#4682B4", name: "Steel Blue", name_zh: "钢蓝色", distractors: ["Iron", "Metal", "Alloy"], distractors_zh: ["铁青色", "金属蓝", "合金蓝"] },
+    { hex: "#87CEEB", name: "Sky Blue", name_zh: "天蓝色", distractors: ["Cloud", "Heaven", "Air"], distractors_zh: ["云朵蓝", "天堂蓝", "空气蓝"] },
+    // Purples
+    { hex: "#800080", name: "Purple", name_zh: "紫色", distractors: ["Violet", "Grape", "Eggplant"], distractors_zh: ["紫罗兰", "葡萄紫", "茄子紫"] },
+    { hex: "#8B008B", name: "Dark Magenta", name_zh: "深品红", distractors: ["Plum", "Orchid", "Mulberry"], distractors_zh: ["梅子紫", "兰花紫", "桑葚紫"] },
+    { hex: "#4B0082", name: "Indigo", name_zh: "靛蓝色", distractors: ["Deep Purple", "Ultraviolet", "Midnight"], distractors_zh: ["深紫色", "紫外光紫", "暗夜紫"] },
+    { hex: "#9400D3", name: "Dark Violet", name_zh: "深紫罗兰", distractors: ["Amethyst", "Lilac", "Wisteria"], distractors_zh: ["紫水晶色", "丁香紫", "紫藤色"] },
+    { hex: "#BA55D3", name: "Medium Orchid", name_zh: "中兰花紫", distractors: ["Lavender", "Thistle", "Heather"], distractors_zh: ["薰衣草紫", "蓟花紫", "石南紫"] },
+    // Pinks
+    { hex: "#FF69B4", name: "Hot Pink", name_zh: "艳粉色", distractors: ["Bubblegum", "Flamingo", "Rose"], distractors_zh: ["泡泡糖粉", "火烈鸟粉", "玫瑰粉"] },
+    { hex: "#FF1493", name: "Deep Pink", name_zh: "深粉色", distractors: ["Fuchsia", "Magenta", "Cerise"], distractors_zh: ["紫红色", "品红色", "樱桃粉"] },
+    { hex: "#FFB6C1", name: "Light Pink", name_zh: "浅粉色", distractors: ["Blush", "Cotton Candy", "Pastel"], distractors_zh: ["腮红色", "棉花糖粉", "柔粉色"] },
+    { hex: "#DB7093", name: "Pale Violet Red", name_zh: "苍紫红", distractors: ["Mauve", "Dusty Rose", "Rosy"], distractors_zh: ["淡紫色", "灰玫瑰色", "蔷薇色"] },
+    // Browns
+    { hex: "#8B4513", name: "Saddle Brown", name_zh: "鞍棕色", distractors: ["Leather", "Cocoa", "Umber"], distractors_zh: ["皮革色", "可可色", "赭色"] },
+    { hex: "#A0522D", name: "Sienna", name_zh: "赭色", distractors: ["Copper", "Terracotta", "Clay"], distractors_zh: ["铜色", "陶土色", "黏土色"] },
+    { hex: "#D2691E", name: "Chocolate", name_zh: "巧克力色", distractors: ["Brown", "Mocha", "Coffee"], distractors_zh: ["棕色", "摩卡色", "咖啡色"] },
+    { hex: "#CD853F", name: "Peru", name_zh: "秘鲁色", distractors: ["Cinnamon", "Ginger", "Nutmeg"], distractors_zh: ["肉桂色", "姜黄色", "肉豆蔻色"] },
+    // Grays
+    { hex: "#808080", name: "Gray", name_zh: "灰色", distractors: ["Silver", "Ash", "Dove"], distractors_zh: ["银色", "烟灰色", "鸽灰色"] },
+    { hex: "#696969", name: "Dim Gray", name_zh: "暗灰色", distractors: ["Charcoal", "Slate", "Granite"], distractors_zh: ["炭灰色", "石板灰", "花岗岩灰"] },
+    { hex: "#A9A9A9", name: "Dark Gray", name_zh: "深灰色", distractors: ["Pewter", "Nickel", "Fog"], distractors_zh: ["锡灰色", "镍灰色", "雾灰色"] },
+    { hex: "#C0C0C0", name: "Silver", name_zh: "银灰色", distractors: ["Platinum", "Chrome", "Mercury"], distractors_zh: ["铂金色", "铬灰色", "水银色"] },
+    // Special
+    { hex: "#00FFFF", name: "Cyan", name_zh: "青色", distractors: ["Aqua", "Turquoise", "Electric Blue"], distractors_zh: ["水色", "绿松石", "电蓝色"] },
+    { hex: "#FF00FF", name: "Magenta", name_zh: "品红色", distractors: ["Fuchsia", "Hot Pink", "Neon Purple"], distractors_zh: ["紫红色", "艳粉", "霓虹紫"] },
+    { hex: "#008080", name: "Teal", name_zh: "蓝绿色", distractors: ["Blue Green", "Aquamarine", "Sea"], distractors_zh: ["青绿色", "海蓝宝石", "海水绿"] },
+    { hex: "#F5F5DC", name: "Beige", name_zh: "米色", distractors: ["Cream", "Ivory", "Tan"], distractors_zh: ["奶油", "象牙白", "棕褐"] },
+    { hex: "#FA8072", name: "Salmon", name_zh: "鲑鱼色", distractors: ["Coral", "Peach", "Shrimp"], distractors_zh: ["珊瑚", "蜜桃", "虾粉色"] },
+    { hex: "#E9967A", name: "Dark Salmon", name_zh: "深鲑鱼色", distractors: ["Terracotta", "Blush", "Flesh"], distractors_zh: ["赤陶色", "腮红", "肉色"] }
+  ];
+
+  // ============================================================
+  // DOM REFERENCES
+  // ============================================================
+  const $ = (id) => document.getElementById(id);
+
+  const startScreen     = $('startScreen');
+  const tutorialScreen  = $('tutorialScreen');
+  const gameScreen      = $('gameScreen');
+  const gameOverScreen  = $('gameOverScreen');
+  const btnPlay         = $('btnPlay');
+  const btnGotIt        = $('btnGotIt');
+  const btnPlayAgain    = $('btnPlayAgain');
+  const btnCbToggle     = $('btnCbToggle');
+  const scoreDisplay    = $('scoreDisplay');
+  const comboDisplay    = $('comboDisplay');
+  const hexLabel        = $('hexLabel');
+  const timerBar        = $('timerBar');
+  const canvas          = $('colorCanvas');
+  const ctx             = canvas.getContext('2d');
+  const canvasWrapper   = $('canvasWrapper');
+  const optionBtns      = document.querySelectorAll('.btn-option');
+  const timerFill       = $('timerFill');
+  const finalScore      = $('finalScore');
+  const bestScore       = $('bestScore');
+  const nicknameInput   = $('nicknameInput');
+  const btnSubmitNickname = $('btnSubmitNickname');
+  const nicknameSection = $('nicknameSection');
+  const gameoverResults = $('gameoverResults');
+  const leaderboardBody = $('leaderboardBody');
+  const leaderboardTable = $('leaderboardTable');
+  const leaderboardEmpty = $('leaderboardEmpty');
+  const leaderboardTitle = $('leaderboardTitle');
+  const btnShare = $('btnShare');
+  const toast = $('toast');
+
+  // ============================================================
+  // GAME STATE
+  // ============================================================
+  const INITIAL_TIME   = 5;
+  const MIN_TIME       = 2;
+  const TIME_DECREMENT = 0.5;
+  const CORRECT_PAUSE  = 300;
+  const WRONG_PAUSE    = 500;
+  const CORRECT_PER_DECREMENT = 5;
+
+  const state = {
+    score: 0,
+    combo: 0,
+    bestScore: 0,
+    timeLimit: INITIAL_TIME,
+    currentColor: null,
+    correctName: '',
+    isLocked: false,
+    timerStart: 0,
+    timerAnimId: null,
+    timerExpired: false,
+    timerElapsed: 0,
+    totalCorrect: 0,
+    recentIndices: [],
+    currentIndex: -1,
+    colorBlindMode: false,
+    tickPlayed: false,
+  };
+
+  // ============================================================
+  // BEST SCORE (localStorage)
+  // ============================================================
+  function loadBestScore() {
+    try {
+      const val = localStorage.getItem('hue-sensei-best');
+      return val ? parseInt(val, 10) : 0;
+    } catch(e) {
+      return 0;
+    }
+  }
+
+  function saveBestScore(score) {
+    try {
+      localStorage.setItem('hue-sensei-best', score.toString());
+    } catch(e) {
+      // localStorage unavailable
+    }
+  }
+
+  // ============================================================
+  // LEADERBOARD (localStorage, Top 10)
+  // ============================================================
+  function getLeaderboardKey() {
+    return state.colorBlindMode ? 'hue-sensei-leaderboard-cb' : 'hue-sensei-leaderboard';
+  }
+
+  function loadLeaderboard() {
+    try {
+      const raw = localStorage.getItem(getLeaderboardKey());
+      return raw ? JSON.parse(raw) : [];
+    } catch(e) {
+      return [];
+    }
+  }
+
+  function saveLeaderboardEntry(entry) {
+    try {
+      const list = loadLeaderboard();
+      list.push(entry);
+      // Sort by score descending, then date ascending
+      list.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return a.date.localeCompare(b.date);
+      });
+      // Keep only top 10
+      const top = list.slice(0, 10);
+      localStorage.setItem(getLeaderboardKey(), JSON.stringify(top));
+    } catch(e) {
+      // localStorage unavailable
+    }
+  }
+
+  function renderLeaderboard() {
+    leaderboardTitle.textContent = state.colorBlindMode
+      ? '\u{1F3C6} Leaderboard (Color-Blind) / 排行榜（色盲模式）'
+      : '\u{1F3C6} Leaderboard / 排行榜';
+    const entries = loadLeaderboard();
+
+    if (entries.length === 0) {
+      leaderboardEmpty.style.display = '';
+      leaderboardTable.style.display = 'none';
+      return;
+    }
+
+    leaderboardEmpty.style.display = 'none';
+    leaderboardTable.style.display = '';
+    leaderboardBody.innerHTML = '';
+
+    entries.forEach((entry, i) => {
+      const rank = i + 1;
+      const tr = document.createElement('tr');
+      if (rank <= 3) tr.className = 'rank-' + rank;
+
+      const nameDisplay = entry.name && entry.name.trim() ? entry.name : '***';
+
+      tr.innerHTML =
+        '<td>' + rank + '</td>' +
+        '<td>' + escapeHtml(nameDisplay) + '</td>' +
+        '<td>' + entry.score + '</td>' +
+        '<td>' + escapeHtml(entry.date) + '</td>';
+
+      leaderboardBody.appendChild(tr);
+    });
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+  }
+
+  // ============================================================
+  // UTILITY
+  // ============================================================
+  function shuffleArray(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  // ============================================================
+  // SCREEN MANAGEMENT
+  // ============================================================
+  function showScreen(screen) {
+    [startScreen, tutorialScreen, gameScreen, gameOverScreen].forEach(s => s.classList.remove('active'));
+    screen.classList.add('active');
+    timerBar.classList.toggle('visible', screen === gameScreen);
+  }
+
+  // ============================================================
+  // CANVAS RENDERING
+  // ============================================================
+  function renderCanvas(hex) {
+    // Polyfill roundRect for older browsers (Bug 5)
+    if (!ctx.roundRect) {
+      ctx.roundRect = function(x, y, w, h, r) {
+        if (typeof r === 'number') r = { tl: r, tr: r, br: r, bl: r };
+        ctx.beginPath();
+        ctx.moveTo(x + r.tl, y);
+        ctx.lineTo(x + w - r.tr, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + r.tr);
+        ctx.lineTo(x + w, y + h - r.br);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - r.br, y + h);
+        ctx.lineTo(x + r.bl, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + r.bl);
+        ctx.lineTo(x, y + r.tl);
+        ctx.quadraticCurveTo(x, y, x + r.tl, y);
+        ctx.closePath();
+      };
+    }
+
+    const rect = canvasWrapper.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const w = rect.width;
+    const h = rect.height;
+
+    canvas.style.width  = w + 'px';
+    canvas.style.height = h + 'px';
+    canvas.width  = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    ctx.clearRect(0, 0, w, h);
+
+    const pad = 4;
+    const rx = pad;
+    const ry = pad;
+    const rw = w - pad * 2;
+    const rh = h - pad * 2;
+    const radius = Math.min(20, rw * 0.06, rh * 0.06);
+
+    // Shadow
+    ctx.shadowColor = 'rgba(0,0,0,0.35)';
+    ctx.shadowBlur = 24;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 8;
+
+    // Main fill
+    ctx.beginPath();
+    ctx.roundRect(rx, ry, rw, rh, radius);
+    ctx.fillStyle = hex;
+    ctx.fill();
+
+    // Subtle inner glow / border
+    ctx.shadowColor = 'transparent';
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Small specular highlight at top
+    const grad = ctx.createLinearGradient(0, ry, 0, ry + rh * 0.3);
+    grad.addColorStop(0, 'rgba(255,255,255,0.06)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.beginPath();
+    ctx.roundRect(rx + 4, ry + 4, rw - 8, rh * 0.25, Math.min(radius - 2, 12));
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Color-blind mode: overlay first letter of English color name
+    if (state.colorBlindMode && state.currentColor) {
+      var letter = state.currentColor.name.charAt(0).toUpperCase();
+      ctx.save();
+      ctx.font = 'bold ' + Math.round(rh * 0.5) + 'px -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.fillText(letter, rx + rw / 2, ry + rh / 2);
+      ctx.restore();
+    }
+  }
+
+  // ============================================================
+  // TIMER
+  // ============================================================
+  function startTimer() {
+    stopTimer();
+    state.timerStart = performance.now();
+    state.timerExpired = false;
+    state.timerElapsed = 0;
+    state.tickPlayed = false;
+    timerFill.style.width = '100%';
+    timerFill.style.backgroundColor = '#27ae60';
+    tickTimer();
+  }
+
+  function tickTimer() {
+    if (state.isLocked) {
+      return;
+    }
+    const now = performance.now();
+    state.timerElapsed = (now - state.timerStart) / 1000;
+    const remaining = Math.max(0, state.timeLimit - state.timerElapsed);
+    const pct = (remaining / state.timeLimit) * 100;
+
+    timerFill.style.width = pct + '%';
+
+    // Green > 50%, Yellow 25-50%, Red < 25%
+    if (pct > 50) {
+      const t = (pct - 50) / 50;
+      timerFill.style.backgroundColor = interpolateColor('#f1c40f', '#27ae60', t);
+    } else if (pct > 25) {
+      const t = (pct - 25) / 25;
+      timerFill.style.backgroundColor = interpolateColor('#e74c3c', '#f1c40f', t);
+    } else {
+      timerFill.style.backgroundColor = '#e74c3c';
+    }
+
+    // Tick sound when under 2 seconds
+    if (remaining <= 2.0 && remaining > 0 && !state.tickPlayed) {
+      state.tickPlayed = true;
+      Audio.tick();
+    }
+
+    if (remaining <= 0 && !state.timerExpired) {
+      state.timerExpired = true;
+      handleTimeout();
+      return;
+    }
+
+    state.timerAnimId = requestAnimationFrame(tickTimer);
+  }
+
+  function stopTimer() {
+    if (state.timerAnimId) {
+      cancelAnimationFrame(state.timerAnimId);
+      state.timerAnimId = null;
+    }
+  }
+
+  // ============================================================
+  // VISIBILITY HANDLER (Bug 1: prevent tab-switch death)
+  // ============================================================
+  document.addEventListener('visibilitychange', function() {
+    if (document.hidden) {
+      // Tab hidden: save elapsed time and stop timer
+      if (state.timerAnimId !== null) {
+        state.timerElapsed = (performance.now() - state.timerStart) / 1000;
+        stopTimer();
+      }
+    } else {
+      // Tab visible: resume timer from where we left off
+      if (state.timerAnimId === null && state.timerStart !== 0 && !state.isLocked && !state.timerExpired && gameScreen.classList.contains('active')) {
+        state.timerStart = performance.now() - (state.timerElapsed * 1000);
+        state.timerAnimId = requestAnimationFrame(tickTimer);
+      }
+    }
+  });
+
+  function interpolateColor(c1, c2, t) {
+    t = Math.max(0, Math.min(1, t));
+    const r1 = parseInt(c1.slice(1,3), 16);
+    const g1 = parseInt(c1.slice(3,5), 16);
+    const b1 = parseInt(c1.slice(5,7), 16);
+    const r2 = parseInt(c2.slice(1,3), 16);
+    const g2 = parseInt(c2.slice(3,5), 16);
+    const b2 = parseInt(c2.slice(5,7), 16);
+    const r = Math.round(r1 + (r2 - r1) * t);
+    const g = Math.round(g1 + (g2 - g1) * t);
+    const b = Math.round(b1 + (b2 - b1) * t);
+    return '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
+  }
+
+  // ============================================================
+  // GAME LOGIC
+  // ============================================================
+  function initGame() {
+    state.score = 0;
+    state.combo = 0;
+    state.totalCorrect = 0;
+    state.timeLimit = INITIAL_TIME;
+    state.isLocked = false;
+    state.recentIndices = [];
+    state.currentIndex = -1;
+    state.timerExpired = false;
+
+    // Fix 12: Push history state so back button can be intercepted
+    window.history.pushState({screen: 'game'}, '', '');
+
+    updateHUD();
+    showScreen(gameScreen);
+    nextRound();
+  }
+
+  function pickColorIndex() {
+    const total = COLORS.length;
+    let idx;
+    do {
+      idx = Math.floor(Math.random() * total);
+    } while (state.recentIndices.includes(idx));
+    state.recentIndices.push(idx);
+    if (state.recentIndices.length > 10) {
+      state.recentIndices.shift();
+    }
+    return idx;
+  }
+
+  function nextRound() {
+    // Reset lock & expired flag
+    state.isLocked = false;
+    state.timerExpired = false;
+    state.tickPlayed = false;
+
+    // Pick a color
+    const idx = pickColorIndex();
+    state.currentIndex = idx;
+    state.currentColor = COLORS[idx];
+
+    // Build bilingual options: "中文 / English"
+    const nameBilingual = state.currentColor.name_zh + ' / ' + state.currentColor.name;
+    state.correctName = nameBilingual;
+
+    const distractors = state.currentColor.distractors_zh.map(function(zh, i) {
+      return zh + ' / ' + state.currentColor.distractors[i];
+    });
+    const options = [nameBilingual, ...distractors];
+    shuffleArray(options);
+
+    // Render canvas
+    renderCanvas(state.currentColor.hex);
+
+    // Update hex label
+    hexLabel.textContent = state.currentColor.hex.toUpperCase();
+
+    // Set button text
+    optionBtns.forEach((btn, i) => {
+      btn.textContent = options[i];
+      btn.className = 'btn-option';
+      btn.disabled = false;
+    });
+
+    // Remove canvas flash classes
+    canvasWrapper.classList.remove('correct-flash', 'wrong-flash');
+
+    // Start timer
+    startTimer();
+  }
+
+  function pickColor(btn) {
+    if (state.isLocked || state.timerExpired) return;
+
+    const name = btn.textContent;
+    const isCorrect = (name === state.correctName);
+
+    state.isLocked = true;
+    stopTimer();
+
+    // Disable all buttons
+    optionBtns.forEach(b => b.disabled = true);
+
+    if (isCorrect) {
+      handleCorrect(btn);
+    } else {
+      handleWrong(btn);
+    }
+  }
+
+  function handleCorrect(btn) {
+    btn.classList.add('correct');
+    canvasWrapper.classList.add('correct-flash');
+    Audio.correct();
+
+    state.score += 1;
+    state.combo += 1;
+    state.totalCorrect += 1;
+
+    // Combo sound every 5 correct in a row
+    if (state.combo > 0 && state.combo % 5 === 0) {
+      Audio.combo();
+    }
+
+    // Time decrease every CORRECT_PER_DECREMENT correct answers
+    if (state.totalCorrect % CORRECT_PER_DECREMENT === 0) {
+      state.timeLimit = Math.max(MIN_TIME, state.timeLimit - TIME_DECREMENT);
+    }
+
+    updateHUD();
+
+    setTimeout(() => {
+      nextRound();
+    }, CORRECT_PAUSE);
+  }
+
+  function handleWrong(btn) {
+    btn.classList.add('wrong');
+    canvasWrapper.classList.add('wrong-flash');
+    Audio.wrong();
+
+    setTimeout(() => {
+      endGame();
+    }, WRONG_PAUSE);
+  }
+
+  function handleTimeout() {
+    if (state.isLocked) return;
+    state.isLocked = true;
+    Audio.wrong();
+
+    // Highlight correct answer briefly
+    optionBtns.forEach(b => {
+      b.disabled = true;
+      if (b.textContent === state.correctName) {
+        b.classList.add('correct');
+      }
+    });
+    canvasWrapper.classList.add('wrong-flash');
+
+    setTimeout(() => {
+      endGame();
+    }, WRONG_PAUSE);
+  }
+
+  function endGame() {
+    stopTimer();
+    state.isLocked = true;
+    nicknameSubmitted = false;
+
+    // Update best score
+    if (state.score > state.bestScore) {
+      state.bestScore = state.score;
+      saveBestScore(state.bestScore);
+    }
+
+    // Show game over screen with nickname prompt
+    showScreen(gameOverScreen);
+
+    // Pre-fill nickname from saved value (Bug 3)
+    var savedNickname = null;
+    try { savedNickname = localStorage.getItem('hue-sensei-nickname'); } catch(e) {}
+    nicknameInput.value = savedNickname || '';
+
+    // Phase 1: show nickname section
+    nicknameSection.classList.remove('hidden');
+    gameoverResults.classList.remove('visible');
+
+    // Focus input after a brief delay (for mobile keyboards)
+    setTimeout(function() { nicknameInput.focus(); }, 300);
+  }
+
+  function submitNickname() {
+    // Bug 4: prevent double submit
+    if (nicknameSubmitted) return;
+    nicknameSubmitted = true;
+
+    const name = nicknameInput.value.trim();
+
+    // Bug 3: persist nickname for auto-fill next time
+    try { localStorage.setItem('hue-sensei-nickname', name); } catch(e) {}
+
+    // Bug 6: skip saving score of 0
+    if (state.score > 0) {
+      const entry = {
+        name: name,
+        score: state.score,
+        date: new Date().toLocaleDateString('en-CA')
+      };
+      saveLeaderboardEntry(entry);
+    }
+
+    // Show score and leaderboard
+    finalScore.textContent = state.score;
+    bestScore.textContent = state.bestScore;
+
+    // Phase 2: hide nickname, show results
+    nicknameSection.classList.add('hidden');
+    gameoverResults.classList.add('visible');
+
+    renderLeaderboard();
+
+    // Scroll to top of game over screen to show score
+    gameOverScreen.scrollTop = 0;
+  }
+
+  // ============================================================
+  // SHARE (with Web Share API + URL + clipboard fallback)
+  // ============================================================
+  // Auto-detect game URL from current page or use placeholder
+  function getGameUrl() {
+    if (window.location.hostname && window.location.hostname !== '' && window.location.hostname !== 'localhost' && !window.location.href.startsWith('file://')) {
+      return window.location.href;
+    }
+    return 'https://yourname.itch.io/hue-sensei'; // Replace after publishing
+  }
+
+  function shareScore() {
+    var shareText = 'I scored ' + state.score + ' in Hue Sensei! Can you beat me? \u{1F3A8}';
+    var shareTextZh = ' 我在辨色达人得了' + state.score + '分！来挑战我吧！';
+    var url = getGameUrl();
+    var fullText = shareText + shareTextZh + '\n' + url;
+
+    // Try Web Share API first (mobile: opens native share sheet with WeChat/WhatsApp/etc)
+    if (navigator.share) {
+      navigator.share({
+        title: 'Hue Sensei / 辨色达人',
+        text: shareText + shareTextZh,
+        url: url
+      }).catch(function() {
+        // User cancelled or error - fall back to clipboard
+        copyToClipboard(fullText);
+      });
+    } else {
+      // Desktop: copy to clipboard with URL
+      copyToClipboard(fullText);
+    }
+  }
+
+  function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(function() {
+      toast.classList.add('visible');
+      setTimeout(function() { toast.classList.remove('visible'); }, 2000);
+    }).catch(function() {
+      // Clipboard failed - still show what we tried to share
+      toast.textContent = text;
+      toast.classList.add('visible');
+      setTimeout(function() { toast.classList.remove('visible'); }, 4000);
+    });
+  }
+
+  function updateHUD() {
+    scoreDisplay.textContent = state.score;
+
+    const el = comboDisplay;
+    const prev = parseInt(el.textContent, 10);
+    el.textContent = state.combo;
+    if (state.combo > prev && state.combo > 1) {
+      el.classList.remove('pop');
+      void el.offsetWidth; // reflow
+      el.classList.add('pop');
+    } else if (state.combo === 0) {
+      el.classList.remove('pop');
+    }
+  }
+
+  // ============================================================
+  // WINDOW RESIZE
+  // ============================================================
+  let resizeTimeout;
+  let nicknameSubmitted = false;
+  function handleResize() {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+      if (state.currentColor && gameScreen.classList.contains('active')) {
+        renderCanvas(state.currentColor.hex);
+      }
+    }, 150);
+  }
+
+  // ============================================================
+  // EVENT BINDING
+  // ============================================================
+  btnPlay.addEventListener('click', () => {
+    Audio.init();
+    state.bestScore = loadBestScore();
+    // Show tutorial on first play per session
+    const hasSeenTutorial = sessionStorage.getItem('hue-sensei-tutorial');
+    if (hasSeenTutorial) {
+      initGame();
+    } else {
+      showScreen(tutorialScreen);
+    }
+  });
+
+  btnGotIt.addEventListener('click', () => {
+    Audio.init();
+    sessionStorage.setItem('hue-sensei-tutorial', '1');
+    state.bestScore = loadBestScore();
+    initGame();
+  });
+
+  btnPlayAgain.addEventListener('click', () => {
+    state.bestScore = loadBestScore();
+    showScreen(startScreen);
+  });
+
+  btnSubmitNickname.addEventListener('click', submitNickname);
+
+  nicknameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submitNickname();
+    }
+  });
+
+  optionBtns.forEach(btn => {
+    btn.addEventListener('click', () => pickColor(btn));
+  });
+
+  btnShare.addEventListener('click', shareScore);
+
+  // Fix 8: Keyboard shortcuts 1-4 and a-d
+  document.addEventListener('keydown', function(e) {
+    if (!gameScreen.classList.contains('active') || state.isLocked) return;
+    const key = e.key.toLowerCase();
+    var keyMap = { '1': 0, '2': 1, '3': 2, '4': 3, 'a': 0, 'b': 1, 'c': 2, 'd': 3 };
+    var idx = keyMap[key];
+    if (idx !== undefined) {
+      e.preventDefault();
+      pickColor(optionBtns[idx]);
+    }
+  });
+
+  // Fix 10: Color-blind mode toggle
+  function updateCbToggleUI() {
+    if (state.colorBlindMode) {
+      btnCbToggle.textContent = '👁️ Color Blind Mode: ON / 色盲模式：开';
+      btnCbToggle.classList.add('active');
+    } else {
+      btnCbToggle.textContent = '👁️ Color Blind Mode / 色盲模式';
+      btnCbToggle.classList.remove('active');
+    }
+  }
+
+  btnCbToggle.addEventListener('click', function() {
+    state.colorBlindMode = !state.colorBlindMode;
+    try { localStorage.setItem('hue-sensei-cb-mode', state.colorBlindMode.toString()); } catch(e) {}
+    updateCbToggleUI();
+    // Re-render canvas if game is active
+    if (state.currentColor && gameScreen.classList.contains('active')) {
+      renderCanvas(state.currentColor.hex);
+    }
+  });
+
+  // Fix 12: Back button guard
+  window.addEventListener('popstate', function(e) {
+    if (gameScreen.classList.contains('active')) {
+      var leave = confirm('Leave the game? / 确定要退出游戏吗？');
+      if (leave) {
+        // Stop timer and go to start screen
+        stopTimer();
+        showScreen(startScreen);
+      } else {
+        // Push state again to stay on page
+        window.history.pushState({screen: 'game'}, '', '');
+      }
+    }
+  });
+
+  window.addEventListener('resize', handleResize);
+
+  // ============================================================
+  // AUDIO (Web Audio API - synthesized, zero files)
+  // ============================================================
+  var Audio = (function() {
+    var ctx = null;
+    function getCtx() {
+      if (!ctx) {
+        try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
+      }
+      return ctx;
+    }
+
+    function playTone(freq, duration, type, vol) {
+      var c = getCtx();
+      if (!c) return;
+      var osc = c.createOscillator();
+      var gain = c.createGain();
+      osc.type = type || 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(vol || 0.15, c.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + duration);
+      osc.connect(gain);
+      gain.connect(c.destination);
+      osc.start(c.currentTime);
+      osc.stop(c.currentTime + duration);
+    }
+
+    return {
+      init: function() {
+        var c = getCtx();
+        if (c && c.state === 'suspended') {
+          c.resume();
+        }
+      },
+      correct: function() {
+        playTone(523, 0.15, 'sine', 0.12);
+        setTimeout(function() { playTone(659, 0.15, 'sine', 0.12); }, 80);
+        setTimeout(function() { playTone(784, 0.2, 'sine', 0.12); }, 160);
+      },
+      wrong: function() {
+        playTone(200, 0.3, 'sawtooth', 0.08);
+        setTimeout(function() { playTone(150, 0.3, 'sawtooth', 0.08); }, 100);
+      },
+      tick: function() {
+        playTone(880, 0.06, 'square', 0.04);
+      },
+      combo: function() {
+        playTone(988, 0.1, 'sine', 0.1);
+        setTimeout(function() { playTone(1175, 0.15, 'sine', 0.1); }, 60);
+      }
+    };
+  })();
+
+  // ============================================================
+  // INIT
+  // ============================================================
+  state.bestScore = loadBestScore();
+  // Fix 10: Load color-blind preference
+  try { state.colorBlindMode = localStorage.getItem('hue-sensei-cb-mode') === 'true'; } catch(e) {}
+  updateCbToggleUI();
+  showScreen(startScreen);
+  timerFill.style.width = '100%';
+  timerFill.style.backgroundColor = '#27ae60';
+
+})();
+</script>
+</body>
+</html>
